@@ -7,6 +7,8 @@ inputs:
     required: true
   DOCKER_PASSWORD:
     required: true
+  DOCKER_REPOSITORY:
+    required: true
 
 runs:
   using: "composite"
@@ -29,10 +31,10 @@ runs:
 
   - name: Tag the Docker image
     run: |
-      docker tag ${{ inputs.API_NAME }} ${{ inputs.API_NAME }}:latest
+      docker tag ${{ inputs.API_NAME }} ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
     shell: bash
 
   - name: Push the Docker image
     run: |
-      docker push ${{ inputs.API_NAME }}:latest
+      docker push ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
     shell: bash
