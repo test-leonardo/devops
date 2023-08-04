@@ -15,6 +15,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+  - name: Check out devops repository
+    uses: actions/checkout@v3
+
+  - name: List contents of root dir
+    run: ls -R
+    shell: bash
+    
   - name: Docker login
     env:
       DOCKER_USERNAME: ${{ inputs.DOCKER_USERNAME }}
