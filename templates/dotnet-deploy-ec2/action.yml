@@ -29,7 +29,7 @@ runs:
 
   - name: Build the Docker image
     run: |
-      docker build -t ${{ inputs.API_NAME }} -f Dockerfile ./app
+      docker build -t ${{ inputs.API_NAME }} -f ./app/Dockerfile .
     shell: bash
 
   - name: Tag the Docker image
