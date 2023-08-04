@@ -20,15 +20,19 @@ runs:
       DOCKER_PASSWORD: ${{ inputs.DOCKER_PASSWORD }}
     run: |
       docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    shell: bash
 
   - name: Build the Docker image
     run: |
       docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
+    shell: bash
 
   - name: Tag the Docker image
     run: |
       docker tag ${{ inputs.API_NAME }} ${{ inputs.API_NAME }}:latest
+    shell: bash
 
   - name: Push the Docker image
     run: |
       docker push ${{ inputs.API_NAME }}:latest
+    shell: bash
