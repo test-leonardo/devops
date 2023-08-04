@@ -1,7 +1,7 @@
 name: deploy
 
 inputs:
-  api-name: 
+  API_NAME: 
     required: true
 
 runs:
@@ -10,23 +10,21 @@ runs:
   - name: Checkout the files
     uses: actions/checkout@v3
 
-  - name: Restore dependencies
-    run: dotnet restore
-  
-  - name: Publish the project
-    run: dotnet publish -c Release -o ./dist/app
+  - name: Docker login
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    run: |
+      docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
-  - name: Copy the Dockerfile
-    run: cp Dockerfile ./dist
+  - name: Build the Docker image
+    run: |
+      docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
 
-  - name: Deploy to EC2 instance
-    uses: easingthemes/ssh-deploy@main
-    with:
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      ARGS: "-rlgoDzvc -i"
-      SOURCE: "dist/app/"
-      REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-      REMOTE_USER: ${{ secrets.REMOTE_USER }}
-      TARGET: "/home/${{ secrets.REMOTE_USER }}/${{ inputs.api-name }}"
-      SCRIPT_AFTER: |
-        (cd /home/${{ secrets.REMOTE_USER }}/${{ inputs.api-name }}; docker build --build-arg API_NAME=${{ inputs.api-name }} -t ${{ inputs.api-name }} -f Dockerfile .)
+  - name: Tag the Docker image
+    run: |
+      docker tag ${{ inputs.API_NAME }} ${{ inputs.API_NAME }}:latest
+
+  - name: Push the Docker image
+    run: |
+      docker push ${{ inputs.API_NAME }}:latest
