@@ -1,0 +1,32 @@
+name: deploy
+
+inputs:
+  api-name: 
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+  - name: Checkout the files
+    uses: actions/checkout@v3
+
+  - name: Restore dependencies
+    run: dotnet restore
+  
+  - name: Publish the project
+    run: dotnet publish -c Release -o ./dist/app
+
+  - name: Copy the Dockerfile
+    run: cp Dockerfile ./dist
+
+  - name: Deploy to EC2 instance
+    uses: easingthemes/ssh-deploy@main
+    with:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      ARGS: "-rlgoDzvc -i"
+      SOURCE: "dist/app/"
+      REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+      REMOTE_USER: ${{ secrets.REMOTE_USER }}
+      TARGET: "/home/${{ secrets.REMOTE_USER }}/${{ inputs.api-name }}"
+      SCRIPT_AFTER: |
+        (cd /home/${{ secrets.REMOTE_USER }}/${{ inputs.api-name }}; docker build --build-arg API_NAME=${{ inputs.api-name }} -t ${{ inputs.api-name }} -f Dockerfile .)
