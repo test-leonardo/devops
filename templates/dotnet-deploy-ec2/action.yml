@@ -15,10 +15,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-  - name: List contents of root dir
-    run: ls -R
-    shell: bash
-
   - name: Docker login
     env:
       DOCKER_USERNAME: ${{ inputs.DOCKER_USERNAME }}
@@ -29,7 +25,7 @@ runs:
 
   - name: Build the Docker image
     run: |
-      docker build -t ${{ inputs.API_NAME }} -f ./app/Dockerfile .
+      docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
     shell: bash
 
   - name: Tag the Docker image
