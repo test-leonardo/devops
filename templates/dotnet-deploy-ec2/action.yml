@@ -3,6 +3,10 @@ name: deploy
 inputs:
   API_NAME: 
     required: true
+  DOCKER_USERNAME: 
+    required: true
+  DOCKER_PASSWORD:
+    required: true
 
 runs:
   using: "composite"
@@ -12,8 +16,8 @@ runs:
 
   - name: Docker login
     env:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      DOCKER_USERNAME: ${{ inputs.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ inputs.DOCKER_PASSWORD }}
     run: |
       docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
 
