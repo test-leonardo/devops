@@ -1,0 +1,34 @@
+name: build-and-deploy
+  
+on:
+  workflow_call:
+    inputs:
+      API_NAME: 
+        required: true
+        type: string
+      DOCKER_USERNAME: 
+        required: true
+        type: string
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout current repository
+      uses: actions/checkout@v3
+
+    - name: Docker login
+      run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+      shell: bash
+
+    - name: Build the Docker image
+      run: docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
+      shell: bash
+
+    - name: Tag the Docker image
+      run: docker tag ${{ inputs.API_NAME }} ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
+      shell: bash
+
+    - name: Push the Docker image
+      run: docker push ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
+      shell: bash
