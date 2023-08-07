@@ -6,7 +6,7 @@ on:
       API_NAME: 
         required: true
         type: string
-      DOCKER_USERNAME: 
+      DOCKER_REPOSITORY: 
         required: true
         type: string
 
