@@ -1,63 +1,143 @@
-name: build-and-deploy
-  
+name: Deploy to Amazon ECS
+
 on:
   workflow_call:
     inputs:
-      API_NAME: 
+      ECR_REPOSITORY: 
         required: true
         type: string
-      DOCKER_REPOSITORY: 
+      ECS_SERVICE:
         required: true
         type: string
+      ECS_TASK_DEFINITION:
+        required: true
+        type: string
+      CONTAINER_NAME:
+        required: true
+        type: string
+
 
 env:
-  HOST: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_HOST || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_HOST || secrets.DEV_HOST }}
-  KEY: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_KEY || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_KEY || secrets.DEV_KEY }}
-  USERNAME: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_USERNAME || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_USERNAME || secrets.DEV_USERNAME }}
+  AWS_REGION: us-east-2                   # set this to your preferred AWS region, e.g. us-west-1
+  ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}           # set this to your Amazon ECR repository name
+  ECS_SERVICE: ${{ inputs.ECS_SERVICE }}                # set this to your Amazon ECS service name
+  ECS_CLUSTER: ECS-Test-Project-Cluster                 # set this to your Amazon ECS cluster name
+  ECS_TASK_DEFINITION: ${{ inputs.ECS_TASK_DEFINITION }} # set this to the path to your Amazon ECS task definition
+                                               # file, e.g. .aws/task-definition.json
+  CONTAINER_NAME: ${{ inputs.CONTAINER_NAME }}           # set this to the name of the container in the
+                                               # containerDefinitions section of your task definition
 
 jobs:
-  build-and-deploy:
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
-    - name: Print branch name
-      run: echo "${{ github.ref }}"
-      shell: bash
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+
+# name: build-and-deploy
+  
+# on:
+#   workflow_call:
+#     inputs:
+#       API_NAME: 
+#         required: true
+#         type: string
+#       DOCKER_REPOSITORY: 
+#         required: true
+#         type: string
+
+# env:
+#   HOST: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_HOST || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_HOST || secrets.DEV_HOST }}
+#   KEY: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_KEY || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_KEY || secrets.DEV_KEY }}
+#   USERNAME: ${{ (github.ref == 'refs/heads/main') && secrets.PROD_USERNAME || (github.ref == 'refs/heads/preprod') && secrets.PREPROD_USERNAME || secrets.DEV_USERNAME }}
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#     - name: Print branch name
+#       run: echo "${{ github.ref }}"
+#       shell: bash
       
-    - name: Checkout current repository
-      uses: actions/checkout@v3
+#     - name: Checkout current repository
+#       uses: actions/checkout@v3
 
-    - name: Docker login
-      run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-      shell: bash
+#     - name: Docker login
+#       run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+#       shell: bash
 
-    - name: Build the Docker image
-      run: docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
-      shell: bash
+#     - name: Build the Docker image
+#       run: docker build -t ${{ inputs.API_NAME }} -f Dockerfile .
+#       shell: bash
 
-    - name: Tag the Docker image
-      run: docker tag ${{ inputs.API_NAME }} ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
-      shell: bash
+#     - name: Tag the Docker image
+#       run: docker tag ${{ inputs.API_NAME }} ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
+#       shell: bash
 
-    - name: Push the Docker image
-      run: docker push ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
-      shell: bash
+#     - name: Push the Docker image
+#       run: docker push ${{ inputs.DOCKER_REPOSITORY }}:${{ inputs.API_NAME }}
+#       shell: bash
     
-    - name: Launch application
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ env.HOST }}
-        username: ${{ env.USERNAME }}
-        key: ${{ env.KEY }}
-        port: ${{ secrets.SSH_PORT }}
-        script: |
-          cd /app
+#     - name: Launch application
+#       uses: appleboy/ssh-action@v1.0.0
+#       with:
+#         host: ${{ env.HOST }}
+#         username: ${{ env.USERNAME }}
+#         key: ${{ env.KEY }}
+#         port: ${{ secrets.SSH_PORT }}
+#         script: |
+#           cd /app
 
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "Running command on production instance"
-          elif [[ "${{ github.ref }}" == "refs/heads/preprod" ]]; then
-            echo "Running command on pre-production instance"
-          else
-            echo "Running command on development instance"
-          fi
-          sudo docker compose up -d --remove-orphans --pull always;
-          sudo docker image prune -a -f;
+#           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+#             echo "Running command on production instance"
+#           elif [[ "${{ github.ref }}" == "refs/heads/preprod" ]]; then
+#             echo "Running command on pre-production instance"
+#           else
+#             echo "Running command on development instance"
+#           fi
+#           sudo docker compose up -d --remove-orphans --pull always;
+#           sudo docker image prune -a -f;
